@@ -1,0 +1,67 @@
+{
+  "name": "webxr-metrics",
+  "description": "Help improve the WebXR API ecosystem and community by sending usage statistics, performance metrics, and JavaScript errors to the Mozilla Mixed Reality team.",
+  "version": "0.0.0",
+  "source": "src/lib/metrics.js",
+  "module": "metrics.es.js",
+  "main": "metrics.js",
+  "umd:main": "metrics.umd.js",
+  "license": "Apache-2.0",
+  "authors": "WebXR Metrics authors",
+  "repository": "https://github.com/MozillaReality/metrics",
+  "homepage": "https://github.com/MozillaReality/metrics",
+  "bugs": {
+    "url": "https://github.com/MozillaReality/metrics/issues"
+  },
+  "files": [
+    "src",
+    "*.js",
+    "*.md",
+    "*.json"
+  ],
+  "dependencies": {
+    "microbundle": "^0.4.4",
+    "node-uuid": "^1.4.8",
+    "uuid": "^3.2.1"
+  },
+  "devDependencies": {
+    "babel-preset-env": "^1.6.1",
+    "nodemon": "^1.11.0",
+    "npm-run-all": "^4.1.2",
+    "prettier": "^1.11.1",
+    "semistandard": "^9.2.1",
+    "shx": "^0.2.2",
+    "snazzy": "^6.0.0"
+  },
+  "babel": {
+    "presets": [
+      [
+        "env",
+        {
+          "targets": {
+            "node": true
+          }
+        }
+      ]
+    ]
+  },
+  "scripts": {
+    "start": "microbundle watch",
+    "build": "npm-run-all --silent -p build:main",
+    "watch": "microbundle watch",
+    "build:main": "microbundle",
+    "lint": "semistandard -v | snazzy",
+    "release": "npm test && git commit -am $npm_package_version && git tag $npm_package_version && git push origin master && git push --tags && npm publish --access public"
+  },
+  "keywords": [
+    "webxr",
+    "webvr",
+    "metrics",
+    "statistics",
+    "stats",
+    "telemetry",
+    "analytics",
+    "google-analytics",
+    "universal-analytics"
+  ]
+}
