@@ -75,6 +75,10 @@ const inDevMode = () => {
   return window.isSecureContext === false || (window.location.protocol === 'http:' && window.location.port);
 };
 
+const getDevicePixelRatio = () => {
+  return window.devicePixelRatio || 1;
+};
+
 const getWebGLCapabilities = () => {
   try {
     const canvas = document.createElement('canvas');
@@ -275,11 +279,11 @@ const Reporter = ((() => {
       return {
         sr: `${window.screen.width}x${window.screen.height}`,
         vp: `${window.innerWidth}x${window.innerHeight}`,
-        dpr: window.devicePixelRatio || 1,
+        dpr: getDevicePixelRatio(),
         capvr: !!navigator.getVRDisplays,
         capxr: !!navigator.xr,
         capgp: !!window.Gamepad,
-        capaudio: (!!window.AudioContext || !!window.webkitAudioContext),
+        capaudio: !!window.AudioContext || !!window.webkitAudioContext,
         capwasm: !!window.WebAssembly,
         capric: !!window.requestIdleCallback,
         capwebgl: getWebGLCapabilities(),

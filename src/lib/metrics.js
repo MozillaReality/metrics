@@ -1,4 +1,4 @@
-/* global localStorage, location */
+/* global location */
 import * as uuid from 'node-uuid';
 
 import Reporter from './reporter.js';
@@ -6,10 +6,55 @@ import Reporter from './reporter.js';
 const PathRE = /'?((\/|\\|[a-z]:\\)[^\s']+)+'?/ig;
 const stripPath = msg => msg.replace(PathRE, '<path>');
 
+class LS {
+  constructor (win = window, prefix = '') {
+    try {
+      this.storage = win.localStorage;
+    } catch (err) {
+      this.storage = {};
+    }
+    this.prefix = prefix || '';
+  }
+
+  get (key) {
+    try {
+      return this.storage[this.prefix + key];
+    } catch (err) {
+      return null;
+    }
+  }
+
+  set (key, value) {
+    try {
+      this.storage[this.prefix + key] = value;
+      return value;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  delete (key) {
+    try {
+      delete this.storage[this.prefix + key];
+    } catch (err) {
+      return null;
+    }
+  }
+
+  clear (key) {
+    try {
+      delete this.storage;
+    } catch (err) {
+      return null;
+    }
+  }
+}
+
 class Metrics {
-  static constructor (tagId, clientId) {
+  static constructor (tagId, clientId, storage, win = window) {
     this.tagId = tagId;
     this.clientId = clientId;
+    this.storage = storage || new LS(win, 'xrAgent.metrics.');
   }
 
   static activate (arg) {
@@ -48,16 +93,15 @@ class Metrics {
     Reporter.sendEvent('window', 'started');
     this.watchExceptions();
     this.watchPageView();
-    this.watchEvents();
-    this.watchPerfTimings();
   }
 
   ensureClientId (callback) {
-    if (localStorage.getItem('xrAgent.metrics.clientId')) {
+    const self = this;
+    if (self.storage.get('clientId')) {
       return callback();
     }
     return this.createClientId(clientId => {
-      localStorage.setItem('xrAgent.metrics.clientId', clientId);
+      self.storage.set('clientId', clientId);
       return callback();
     });
   }
@@ -70,31 +114,31 @@ class Metrics {
   }
 
   getClientId () {
-    return localStorage.getItem('xrAgent.metrics.clientId');
+    return this.storage.get('clientId');
   }
 
   getTagId () {
     if (this.tagId) {
       return this.tagId;
     }
-    this.tagId = localStorage.getItem('xrAgent.metrics.tagId');
+    this.tagId = this.storage.get('tagId');
     return this.tagId;
   }
 
   setTagId (tagId) {
-    this.tagId = localStorage.setItem('xrAgent.metrics.tagId', tagId);
+    this.tagId = this.storage.set('tagId', tagId);
     return tagId;
   }
 
   watchExceptions () {
     return this.subscriptions.push(() => {
       window.addEventListener('error', event => {
-        let errorMessage = event;
+        let errMsg = event;
         if (typeof event !== 'string') {
-          errorMessage = event.message;
+          errMsg = event.message;
         }
-        errorMessage = (stripPath(errorMessage) || 'Unknown').replace('Uncaught ', '').slice(0, 150);
-        return Reporter.sendException(errorMessage);
+        errMsg = (stripPath(errMsg) || 'Unknown').replace('Uncaught ', '').slice(0, 150);
+        return Reporter.sendException(errMsg);
       });
     });
   }
@@ -102,24 +146,6 @@ class Metrics {
   watchPageView () {
     return this.subscriptions.push(() => {
       Reporter.sendPageView(location.pathname, location.href, document.title);
-    });
-  }
-
-  watchEvents () {
-    return this.subscriptions.push(() => {
-      // TODO: Call `Reporter.sendCommand(event.type)` for each whitelisted event (e.g., `vrdisplay*` in WebVR v1.1).
-      // READ:
-      //   - https://github.com/cvan/webxr-agent/blob/fe94ff57a0a2a90fe1d48cb7b3dba5a1105909db/public/telemetry.js#L129-L159
-    });
-  }
-
-  watchTimings () {
-    return this.subscriptions.push(() => {
-      // TODO: Measure load times for `LoaderParsing`, `LoaderParsingStart`, `LoadingStart`.
-      // READ:
-      //   - https://github.com/mozilla/unity-webvr-export/pull/189/files
-      //     - https://github.com/delapuente/unity-webvr-export/blob/fd5b1fb9/Assets/WebGLTemplates/WebVR/index.html#L14-L29
-      //     - https://github.com/delapuente/unity-webvr-export/blob/fd5b1fb9/Assets/WebGLTemplates/WebVR/webvr.js#L40
     });
   }
 }
