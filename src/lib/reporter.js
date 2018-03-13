@@ -1,4 +1,4 @@
-/* global localStorage, XMLHttpRequest */
+/* global XMLHttpRequest */
 let querystring = {};
 function strictUriEncode (str) {
   return encodeURIComponent(str).replace(/[!'()*]/g, x => `%${x.charCodeAt(0).toString(16).toUpperCase()}`);
@@ -71,93 +71,95 @@ const post = (url, data = null) => {
   return xhr.send(data);
 };
 
-const inDevMode = () => {
-  return window.isSecureContext === false || (window.location.protocol === 'http:' && window.location.port);
+const inDevMode = (win) => {
+  return win.isSecureContext === false || (win.location.protocol === 'http:' && win.location.port);
 };
 
-const getDevicePixelRatio = () => {
-  return window.devicePixelRatio || 1;
+const getDevicePixelRatio = (win) => {
+  return win.devicePixelRatio || 1;
 };
 
-const getWebGLCapabilities = () => {
+const getWebGLCapabilities = (win, doc) => {
   try {
-    const canvas = document.createElement('canvas');
+    const canvas = doc.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     /* eslint-disable no-undef */
-    return (gl && gl instanceof WebGLRenderingContext) || false;
+    return (gl && gl instanceof win.WebGLRenderingContext) || false;
     /* eslint-enable no-undef */
   } catch (err) {
     return false;
   }
 };
 
-const getWebGL2Capabilities = () => {
+const getWebGL2Capabilities = (win, doc) => {
   try {
-    const canvas = document.createElement('canvas');
+    const canvas = doc.createElement('canvas');
     const gl = canvas.getContext('webgl2');
     /* eslint-disable no-undef */
-    return (gl && gl instanceof WebGL2RenderingContext) || false;
+    return (gl && gl instanceof win.WebGL2RenderingContext) || false;
     /* eslint-enable no-undef */
   } catch (err) {
     return false;
   }
 };
 
-const getUserAgent = () => {
-  return navigator.userAgent;
+const getUserAgent = (win) => {
+  return win.navigator.userAgent;
 };
 
-const getEndianness = () => {
-  if (!window.ArrayBuffer) {
+const getEndianness = (win) => {
+  if (!win.ArrayBuffer) {
     return 'Unknown';
   }
-  const buffer = new ArrayBuffer(4);
-  const intView = new Uint32Array(buffer);
-  const byteView = new Uint8Array(buffer);
+  const buffer = new win.ArrayBuffer(4);
+  const intView = new win.Uint32Array(buffer);
+  const byteView = new win.Uint8Array(buffer);
   intView[0] = 1;
   return byteView[0] === 1 ? 'little' : 'big';
 };
 
 const Reporter = ((() => {
   class Reporter {
-    constructor (tagId = '') {
+    constructor (tagId = '', storage) {
       if (!tagId) {
         throw new Error('`tagId` argument required for `Reporter` (e.g., `XXXXXX-YY`)');
       }
       this.tagId = tagId;
+      this.consented = this.hasConsented();
+      this.storage = storage || new LS(win, 'xrAgent.metrics.');
     }
 
-    static setTagId (tagId = null) {
+    setTagId (tagId = null) {
       this.tagId = tagId;
     }
 
-    static saveConsent (consented = true) {
-      if (!Reporter.consented()) {
+    saveConsent (consented = true) {
+      if (this.hasConsented()) {
         return false;
       }
-      localStorage.setItem('xrAgent.metrics.settings.consent', consented ? 'true' : 'false');
+      this.storage.set('settings.consent', consented ? 'true' : 'false');
       return true;
     }
 
-    static removeConsent (consented = true) {
-      if (!Reporter.consented()) {
+    removeConsent (consented = true) {
+      if (!this.hasConsented()) {
         return false;
       }
-      localStorage.removeItem('xrAgent.metrics.clientId');
-      localStorage.removeItem('xrAgent.metrics.name');
-      localStorage.removeItem('xrAgent.metrics.version');
-      localStorage.removeItem('xrAgent.metrics.settings.consent');
+      this.storage.remove('clientId');
+      this.storage.remove('name');
+      this.storage.remove('version');
+      this.storage.remove('settings.consent');
       return true;
     }
 
-    static consented () {
-      if (!Reporter.consented()) {
-        return false;
+    hasConsented () {
+      if (this.consented === true) {
+        return true;
       }
-      return localStorage.getItem('xrAgent.metrics.settings.consent') !== 'false';
+      return this.storage.get('settings.consent') !== 'false';
     }
 
-    static sendPageView (path, hostname, title, extraParams) {
+    sendPageView (path, hostname, title, extraParams) {
       const params = {
         t: 'pageview',
         path,
@@ -168,7 +170,7 @@ const Reporter = ((() => {
       return this.send(params);
     }
 
-    static sendEvent (category, action, label, value) {
+    sendEvent (category, action, label, value) {
       const params = {
         t: 'event',
         ec: category,
@@ -183,7 +185,7 @@ const Reporter = ((() => {
       return this.send(params);
     }
 
-    static sendTiming (category, name, value) {
+    sendTiming (category, name, value) {
       const params = {
         t: 'timing',
         utc: category,
@@ -193,16 +195,16 @@ const Reporter = ((() => {
       return this.send(params);
     }
 
-    static sendException (description) {
+    sendException (description) {
       const params = {
         t: 'exception',
         exd: description,
-        exf: inDevMode() ? '0' : '1'
+        exf: inDevMode(this.win) ? '0' : '1'
       };
       return this.send(params);
     }
 
-    static sendCommand (commandName) {
+    sendCommand (commandName) {
       let base;
       let params;
       if (this.commandCount === null) {
@@ -222,13 +224,13 @@ const Reporter = ((() => {
       return this.send(params);
     }
 
-    static send (params) {
-      if (!Reporter.consented()) {
+    send (params) {
+      if (!this.hasConsented()) {
         return;
       }
 
-      this.tagId = params.tagId || this.tagId || localStorage.getItem('xrAgent.metrics.tagId');
-      this.clientId = this.clientId || localStorage.getItem('xrAgent.metrics.clientId');
+      this.tagId = params.tagId || this.tagId || this.storage.get('tagId');
+      this.clientId = this.clientId || this.storage.get('clientId');
 
       this.dp = params.dp || params.uri || this.uri;
       this.p = params.p || this.p || this.dp;
@@ -238,8 +240,8 @@ const Reporter = ((() => {
       this.dr = params.referrer || params.dr || this.dr;
       this.uip = params.remoteAddr || params.uip || this.uip;
 
-      this.xrAgentName = this.xrAgentName || localStorage.getItem('xrAgent.metrics.name');
-      this.xrAgentVersion = this.xrAgentVersion || localStorage.getItem('xrAgent.metrics.version');
+      this.xrAgentName = this.xrAgentName || this.storage.get('name');
+      this.xrAgentVersion = this.xrAgentVersion || this.storage.get('version');
 
       if (!navigator.onLine) {
         return;
@@ -261,40 +263,40 @@ const Reporter = ((() => {
         av: this.xrAgentVersion,  // App Version.
         aiid: ''  // TODO: Add App Installer ID.
       });
-      params = Object.assign({}, params, Reporter.consentedParams());
-      if (Reporter.isTelemetryConsentChoice(params)) {
-        return Reporter.request(`https://ssl.google-analytics.com/collect?${querystring.stringify(params)}`);
+      params = Object.assign({}, params, this.consentedParams());
+      if (this.isTelemetryConsentChoice(params)) {
+        return this.request(`https://ssl.google-analytics.com/collect?${querystring.stringify(params)}`);
       }
     }
 
-    static isTelemetryConsentChoice (params) {
-      return params.t === 'event' && params.ec === 'setting' && params.ea === 'xrAgent.metrics.settings.consent';
+    isTelemetryConsentChoice (params) {
+      return params.t === 'event' && params.ec === 'setting' && params.ea === 'settings.consent';
     }
 
-    static request (url) {
+    request (url) {
       return post(url);
     }
 
-    static consentedParams () {
+    consentedParams () {
       return {
-        sr: `${window.screen.width}x${window.screen.height}`,
-        vp: `${window.innerWidth}x${window.innerHeight}`,
-        dpr: getDevicePixelRatio(),
-        capvr: !!navigator.getVRDisplays,
-        capxr: !!navigator.xr,
-        capgp: !!window.Gamepad,
-        capaudio: !!window.AudioContext || !!window.webkitAudioContext,
-        capwasm: !!window.WebAssembly,
-        capric: !!window.requestIdleCallback,
-        capwebgl: getWebGLCapabilities(),
-        capwebgl2: getWebGL2Capabilities(),
-        capworker: !!window.Worker,
-        capsw: !!navigator.serviceWorker,
-        caphc: navigator.hardwareConcurrency || 0,
-        capws: !!window.WebSocket || false,
-        capwebrtc: (!!window.RTCPeerConnection && !!window.RTCDataChannelEvent) || false,
-        capendian: getEndianness(),
-        ua: getUserAgent()
+        sr: `${this.win.screen.width}x${this.win.screen.height}`,
+        vp: `${this.win.innerWidth}x${this.win.innerHeight}`,
+        dpr: getDevicePixelRatio(this.win),
+        capvr: !!this.win.navigator.getVRDisplays,
+        capxr: !!this.win.navigator.xr,
+        capgp: !!this.win.Gamepad,
+        capaudio: !!this.win.AudioContext || !!this.win.webkitAudioContext,
+        capwasm: !!this.win.WebAssembly,
+        capric: !!this.win.requestIdleCallback,
+        capwebgl: getWebGLCapabilities(this.win),
+        capwebgl2: getWebGL2Capabilities(this.win),
+        capworker: !!this.win.Worker,
+        capsw: !!this.win.navigator.serviceWorker,
+        caphc: this.win.navigator.hardwareConcurrency || 0,
+        capws: !!this.win.WebSocket || false,
+        capwebrtc: (!!this.win.RTCPeerConnection && !!this.win.RTCDataChannelEvent) || false,
+        capendian: getEndianness(this.win),
+        ua: getUserAgent(this.win)
       };
     }
   }

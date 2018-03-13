@@ -1,64 +1,33 @@
 /* global location */
-import * as uuid from 'node-uuid';
-
+import LS from './storage.js';
 import Reporter from './reporter.js';
 
 const PathRE = /'?((\/|\\|[a-z]:\\)[^\s']+)+'?/ig;
 const stripPath = msg => msg.replace(PathRE, '<path>');
 
-class LS {
-  constructor (win = window, prefix = '') {
-    try {
-      this.storage = win.localStorage;
-    } catch (err) {
-      this.storage = {};
+function uuidV4 () {
+  let uuid = '';
+  let idx;
+  let random;
+  for (ix = 0; idx < 32; idx++) {
+    random = Math.random() * 16 | 0;
+    if (idx === 8 || idx === 12 || idx === 16 || idx === 20) {
+      uuid += '-';
     }
-    this.prefix = prefix || '';
+    uuid += (idx == 12 ? 4 : (idx == 16 ? (random & 3 | 8) : random)).toString(16);
   }
-
-  get (key) {
-    try {
-      return this.storage[this.prefix + key];
-    } catch (err) {
-      return null;
-    }
-  }
-
-  set (key, value) {
-    try {
-      this.storage[this.prefix + key] = value;
-      return value;
-    } catch (err) {
-      return null;
-    }
-  }
-
-  delete (key) {
-    try {
-      delete this.storage[this.prefix + key];
-    } catch (err) {
-      return null;
-    }
-  }
-
-  clear (key) {
-    try {
-      delete this.storage;
-    } catch (err) {
-      return null;
-    }
-  }
+  return uuid;
 }
 
 class Metrics {
-  static constructor (tagId, clientId, storage, win = window) {
+  constructor (tagId, clientId, storage, win = window, doc = document) {
     this.tagId = tagId;
     this.clientId = clientId;
     this.storage = storage || new LS(win, 'xrAgent.metrics.');
   }
 
-  static activate (arg) {
-    if (!Reporter.consented()) {
+  activate (arg) {
+    if (!this.consented()) {
       return false;
     }
     this.subscriptions = [];
@@ -110,7 +79,7 @@ class Metrics {
     if (this.clientId) {
       return callback(this.clientId);
     }
-    return callback(uuid.v4);
+    return callback(uuidV4);
   }
 
   getClientId () {
@@ -144,29 +113,33 @@ class Metrics {
   }
 
   watchPageView () {
-    return this.subscriptions.push(() => {
-      Reporter.sendPageView(location.pathname, location.href, document.title);
+    const self = this;
+    return self.subscriptions.push(() => {
+      Reporter.sendPageView(self.win.location.pathname, self.win.location.href, self.doc.title);
     });
   }
 }
 
-const tagId = getTag();
-const metrics = new Metrics(tagId);
-metrics.activate();
-
-function getTag (scriptUrl) {
-  if (document.currentScript) {
-    return document.currentScript.getAttribute('data-tag');
+function getTag (scriptUrl, win, doc) {
+  win = win || window;
+  doc = doc || document;
+  scriptUrl = scriptUrl || doc.scriptURL || (doc.currentScript && doc.currentScript.src);
+  if (!scriptUrl && doc.currentScript) {
+    scriptUrl = doc.currentScript.getAttribute('data-tag');
   }
-  scriptUrl = scriptUrl || document.scriptURL || (document.currentScript && document.currentScript.src);
   if (!scriptUrl) {
     return null;
   }
   try {
-    return new window.URLSearchParams(new window.URL(scriptUrl).search).get('tag');
+    return new win.URLSearchParams(new win.URL(scriptUrl).search).get('tag');
   } catch (err) {
+    alert(scriptUrl);
     return (scriptUrl.match(/[?&]tag=(.+)/i) || [])[1];
   }
 }
+
+const tagId = getTag(null, window, document);
+const metrics = new Metrics(tagId, null, window, document);
+metrics.activate();
 
 export default metrics;

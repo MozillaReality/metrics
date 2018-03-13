@@ -20,9 +20,7 @@
     "*.json"
   ],
   "dependencies": {
-    "microbundle": "^0.4.4",
-    "node-uuid": "^1.4.8",
-    "uuid": "^3.2.1"
+    "microbundle": "^0.4.4"
   },
   "devDependencies": {
     "babel-preset-env": "^1.6.1",
