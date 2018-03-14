@@ -5,6 +5,11 @@ import Reporter from './reporter.js';
 const PathRE = /'?((\/|\\|[a-z]:\\)[^\s']+)+'?/ig;
 const stripPath = msg => msg.replace(PathRE, '<path>');
 
+/**
+ * Generates a random UUID (version 4), compliant with RFC4122 (https://www.ietf.org/rfc/rfc4122.txt).
+ *
+ * Source adapted from https://gist.github.com/jcxplorer/823878
+ */
 function uuidV4 () {
   let uuid = '';
   let idx;
@@ -20,18 +25,21 @@ function uuidV4 () {
 }
 
 class Metrics {
-  constructor (tagId, clientId, storage, win = window, doc = document) {
+  constructor (tagId, clientId, storage, reporter, win = window, doc = document) {
     this.tagId = tagId;
     this.clientId = clientId;
-    this.storage = storage || new LS(win, 'xrAgent.metrics.');
+    this.win = win || window;
+    this.doc = doc || document;
+    this.storage = storage || new LS(this.win, 'xrAgent.metrics.');
+    this.reporter = reporter || new Reporter(this.tagId, this.storage, this.win, this.doc);
   }
 
-  activate (arg) {
-    if (!this.consented()) {
+  activate (arg = {}) {
+    if (!this.reporter.hasConsented()) {
       return false;
     }
     this.subscriptions = [];
-    let sessionLength = arg.sessionLength;
+    let sessionLength = arg.sessionLength || Date.now();
     return this.ensureClientId(((_this => () => _this.begin(sessionLength)))(this));
   }
 
@@ -48,18 +56,18 @@ class Metrics {
 
   provideReporter () {
     return {
-      sendEvent: Reporter.sendEvent.bind(Reporter),
-      sendTiming: Reporter.sendTiming.bind(Reporter),
-      sendException: Reporter.sendException.bind(Reporter)
+      sendEvent: this.reporter.sendEvent.bind(this.reporter),
+      sendTiming: this.reporter.sendTiming.bind(this.reporter),
+      sendException: this.reporter.sendException.bind(this.reporter)
     };
   }
 
   begin (sessionLength) {
     this.sessionStart = Date.now();
     if (sessionLength) {
-      Reporter.sendEvent('window', 'ended', null, sessionLength);
+      this.reporter.sendEvent('window', 'ended', null, sessionLength);
     }
-    Reporter.sendEvent('window', 'started');
+    this.reporter.sendEvent('window', 'started');
     this.watchExceptions();
     this.watchPageView();
   }
@@ -69,7 +77,7 @@ class Metrics {
     if (self.storage.get('clientId')) {
       return callback();
     }
-    return this.createClientId(clientId => {
+    return self.createClientId(clientId => {
       self.storage.set('clientId', clientId);
       return callback();
     });
@@ -86,28 +94,28 @@ class Metrics {
     return this.storage.get('clientId');
   }
 
-  getTagId () {
+  getTid () {
     if (this.tagId) {
       return this.tagId;
     }
-    this.tagId = this.storage.get('tagId');
+    this.tagId = this.storage.get('tid');
     return this.tagId;
   }
 
-  setTagId (tagId) {
-    this.tagId = this.storage.set('tagId', tagId);
+  setTid (tagId) {
+    this.tagId = this.storage.set('tid', tagId);
     return tagId;
   }
 
   watchExceptions () {
     return this.subscriptions.push(() => {
-      window.addEventListener('error', event => {
-        let errMsg = event;
-        if (typeof event !== 'string') {
-          errMsg = event.message;
+      window.addEventListener('error', evt => {
+        let errMsg = evt;
+        if (typeof evt !== 'string') {
+          errMsg = evt.message;
         }
         errMsg = (stripPath(errMsg) || 'Unknown').replace('Uncaught ', '').slice(0, 150);
-        return Reporter.sendException(errMsg);
+        return self.reporter.sendException(errMsg);
       });
     });
   }
@@ -115,7 +123,7 @@ class Metrics {
   watchPageView () {
     const self = this;
     return self.subscriptions.push(() => {
-      Reporter.sendPageView(self.win.location.pathname, self.win.location.href, self.doc.title);
+      self.reporter.sendPageView(self.win.location.pathname, self.win.location.href, self.doc.title);
     });
   }
 }
@@ -131,15 +139,16 @@ function getTag (scriptUrl, win, doc) {
     return null;
   }
   try {
-    return new win.URLSearchParams(new win.URL(scriptUrl).search).get('tag');
+    const qs = new win.URLSearchParams(new win.URL(scriptUrl).search);
+    return qs.get('tag');
   } catch (err) {
-    alert(scriptUrl);
     return (scriptUrl.match(/[?&]tag=(.+)/i) || [])[1];
   }
 }
 
 const tagId = getTag(null, window, document);
-const metrics = new Metrics(tagId, null, window, document);
+const reporter = new Reporter(tagId, null, window, document);
+const metrics = new Metrics(tagId, null, null, reporter, window, document);
 metrics.activate();
 
 export default metrics;
