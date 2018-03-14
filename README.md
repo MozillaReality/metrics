@@ -17,11 +17,11 @@ Or this:
 <script>
   // Telemetry for collecting basic usage statistics, performance metrics, and catching errors.
   (function () {
-    function injectScript () {
-      if (injectScript.injected || !navigator.onLine) {
+    function injectMetrics () {
+      if (injectMetrics.injected || !navigator.onLine) {
         return;
       }
-      injectScript.injected = true;
+      injectMetrics.injected = true;
       var refScript = document.querySelector('script');
       var script = document.createElement('script');
       script.src = 'https://webxr.services/metrics.js';
@@ -29,8 +29,8 @@ Or this:
       script.crossorigin = 'anonymous';
       (refScript ? refScript.parentNode : document.head).insertBefore(script, ref);
     }
-    injectScript();
-    window.addEventListener('online', injectScript);
+    injectMetrics();
+    window.addEventListener('online', injectMetrics);
   })();
 </script>
 ````
