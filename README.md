@@ -18,9 +18,10 @@ Or this:
   // Telemetry for collecting basic usage statistics, performance metrics, and catching errors.
   (function () {
     function injectScript () {
-      if (!navigator.onLine) {
+      if (injectScript.injected || !navigator.onLine) {
         return;
       }
+      injectScript.injected = true;
       var refScript = document.querySelector('script');
       var script = document.createElement('script');
       script.src = 'https://webxr.services/metrics.js';
