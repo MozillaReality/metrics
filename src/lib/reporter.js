@@ -137,6 +137,7 @@ class Reporter {
       return;
     }
 
+    // Reference: https://github.com/peaksandpies/universal-analytics/blob/master/AcceptableParams.md
     params = Object.assign({}, params, {
       v: '1',  // Protocol version.
       aip: 1,  // Anonymize IP.
