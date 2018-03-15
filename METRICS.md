@@ -36,7 +36,7 @@ When you grant us permission, of course, these are the metrics we collect to bet
     - Splash screen
     - Unity game
 - Amount of time the active page was open for ("session length")
-- Browser's `User-Agent` string (i.e., `navigator.userAgent`)
+- Browser/User-Agent's name, version, OS, CPU (i.e., `navigator.userAgent`)
 - [WebGL 1.0 API](https://www.khronos.org/registry/webgl/specs/latest/1.0/) support
 - [WebGL 2.0 API](https://www.khronos.org/registry/webgl/specs/latest/2.0/) support
 - [Gamepad API](https://w3c.github.io/gamepad/)
