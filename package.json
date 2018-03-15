@@ -1,6 +1,6 @@
 {
   "name": "webxr-metrics",
-  "description": "Help improve the WebXR API ecosystem and community by sending usage statistics, performance metrics, and JavaScript errors to the Mozilla Mixed Reality team.",
+  "description": "Help improve the WebXR API and ecosystem by sending usage statistics, performance metrics, and JavaScript errors to the Mozilla Mixed Reality team.",
   "version": "0.0.0",
   "source": "src/lib/metrics.js",
   "module": "metrics.es.js",
