@@ -1,26 +1,45 @@
-/* global XMLHttpRequest */
+import Capabilities from './capabilities.js';
 import LS from './storage.js';
 
-import { Capbilities, postBeacon, querystring } from './utils.js';
+import utils from './utils.js';
+
+let ua = {
+  config: {
+    protocolVersion: '1',
+    dataSource: 'web'
+  }
+};
 
 const inDevMode = (win) => {
   return win.isSecureContext === false || (win.location.protocol === 'http:' && win.location.port);
 };
 
+const defaultOptions = {
+  trackingId: '',
+  baseTelemetryCollectionUrl: 'https://ssl.google-analytics.com/collect?'
+};
+
 class Reporter {
-  constructor (tid = '', storage, win = window, doc = document) {
-    if (!tid) {
-      throw new Error('`tid` argument required for `Reporter` (e.g., `XXXXXX-YY`)');
+  constructor (opts, storage, win = window, doc = document, nav = navigator) {
+    if (typeof opts === 'string') {
+      this.opts = {trackingId: opts};
+    } else {
+      this.opts = Object.assign({}, this.opts, defaultOptions);
     }
-    this.tid = tid;
+    this.trackingId = this.opts.trackingId;
+    if (!this.trackingId) {
+      throw new Error('`trackingId` argument required for `Reporter` (e.g., `UA-XXXXXXXXX-Y`)');
+    }
+    this.baseTelemetryCollectionUrl = this.opts.baseTelemetryCollectionUrl;
     this.win = win || window;
     this.doc = doc || document;
+    this.nav = nav || this.win.navigator || navigator || {};
     this.storage = storage || new LS(this.win, 'xrAgent.metrics.');
     this.consented = this.hasConsented();
   }
 
-  settid (tid = null) {
-    this.tid = tid;
+  setTrackingId (trackingId = null) {
+    this.trackingId = trackingId;
   }
 
   saveConsent (consented = true) {
@@ -35,10 +54,12 @@ class Reporter {
     if (!this.hasConsented()) {
       return false;
     }
-    this.storage.remove('clientId');
-    this.storage.remove('name');
-    this.storage.remove('version');
-    this.storage.remove('settings.consent');
+    this.storage.remove([
+      'clientId',
+      'name',
+      'version',
+      'settings.consent'
+    ]);
     return true;
   }
 
@@ -95,16 +116,15 @@ class Reporter {
   }
 
   sendCommand (commandName) {
-    let base;
-    let params;
     if (this.commandCount === null) {
       this.commandCount = {};
     }
-    if ((base = this.commandCount)[commandName] === null) {
+    let base = this.commandCount;
+    if (base[commandName] === null) {
       base[commandName] = 0;
     }
     this.commandCount[commandName]++;
-    params = {
+    const params = {
       t: 'event',
       ec: 'command',
       ea: commandName.split(':')[0],
@@ -119,11 +139,11 @@ class Reporter {
       return;
     }
 
-    this.tid = params.tid || this.tid || this.storage.get('tid');
+    this.trackingId = params.trackingId || this.trackingId || this.storage.get('trackingId');
     this.clientId = this.clientId || this.storage.get('clientId');
 
-    this.dp = params.dp || params.uri || this.uri;
-    this.p = params.p || this.p || this.dp;
+    this.documentPath = params.documentPath || params.uri || this.uri;
+    this.p = params.p || this.p || this.documentPath;
 
     this.dh = params.host || params.dh || this.host;
     this.dt = params.title || params.dt || this.title;
@@ -139,11 +159,10 @@ class Reporter {
 
     // Reference: https://github.com/peaksandpies/universal-analytics/blob/master/AcceptableParams.md
     params = Object.assign({}, params, {
-      v: '1',  // Protocol version.
+      v: ua.config.protocolVersion,  // Protocol version.
       aip: 1,  // Anonymize IP.
-      tid: this.tid,  // Tracking ID.
-      ds: 'web',  // Data source.
-      // cd: this.screenName,  // TODO: Add Screen Name.
+      tid: this.trackingId,  // Tracking ID.
+      ds: ua.config.dataSource,  // Data source.
       cid: this.clientId,  // Client ID.
       dp: this.uri,
       dh: this.dh,
@@ -152,12 +171,11 @@ class Reporter {
       p: this.p,
       uip: this.remoteAddr,
       an: this.xrAgentName,  // App Name.
-      av: this.xrAgentVersion,  // App Version.
-      aiid: ''  // TODO: Add App Installer ID.
+      av: this.xrAgentVersion  // App Version.
     });
     params = Object.assign({}, params, this.consentedParams());
     if (this.isTelemetryConsentChoice(params)) {
-      return this.request(`https://ssl.google-analytics.com/collect?${querystring.stringify(params)}`);
+      return this.request(`${this.baseTelemetryCollectionUrl}${utils.querystring.stringify(params)}`);
     }
   }
 
@@ -166,30 +184,34 @@ class Reporter {
   }
 
   request (url) {
-    return postBeacon(url);
+    console.log('request', url);
+    return utils.postBeacon(url);
   }
 
   consentedParams () {
-    const capabilities = new Capabilities(this.win);
+    const capabilities = new Capabilities(this.win, this.doc, this.nav);
+    const hardware = capabilities.hardwareFeatures;
+    const browser = capabilities.browserFeatures;
+    console.log(capabilities, hardware);
     return {
-      sr: capabilities.hardwareFeatures.screenSize,
-      vp: capabilities.hardwareFeatures.windowSize,
-      dpr: capabilities.hardwareFeatures.devicePixelRatio,
-      capvr: capabilities.browserFeatures.webvr,
-      capxr: capabilities.browserFeatures.webxr
-      capgp: capabilities.browserFeatures.gamepads,
-      capaudio: capabilities.browserFeatures.webaudio,
-      capwasm: capabilities.browserFeatures.wasm,
-      capric: capabilities.browserFeatures.requestIdleCallback,
-      capwebgl: capabilities.browserFeatures.webgl,
-      capwebgl2: capabilities.browserFeatures.webgl2,
-      capworker: capabilities.browserFeatures.worker,
-      capsw: capabilities.browserFeatures.serviceworker,
-      caphc: capabilities.hardwareFeatures.workerPoolSize,
-      capws: capabilities.browserFeatures.websocket,
-      capwebrtc: capabilities.browserFeatures.webrtc,
-      capendian: capabilities.hardwareFeatures.endianness,
-      ua: this.win.navigator.userAgent
+      sr: hardware.screenResolution,
+      vp: hardware.windowSize,
+      dpr: hardware.devicePixelRatio,
+      capvr: browser.webvr,
+      capxr: browser.webxr,
+      capgp: browser.gamepads,
+      capaudio: browser.webaudio,
+      capwasm: browser.wasm,
+      capric: browser.requestIdleCallback,
+      capwebgl: browser.webgl,
+      capwebgl2: browser.webgl2,
+      capworker: browser.worker,
+      capsw: browser.serviceworker,
+      caphc: hardware.workerPoolSize,
+      capws: browser.websocket,
+      capwebrtc: browser.webrtc,
+      capendian: hardware.endianness,
+      ua: browser.userAgent
     };
   }
 }

@@ -1,3 +1,1 @@
-import * from './lib/metrics.js';
-
-export default metrics;
+export * from './lib/metrics.js';

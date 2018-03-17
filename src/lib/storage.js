@@ -25,12 +25,19 @@ class LS {
     }
   }
 
-  delete (key) {
+  remove (key) {
+    if (Array.isArray(key)) {
+      return key.map(name => this.remove(name));
+    }
     try {
       delete this.storage[this.prefix + key];
     } catch (err) {
       return null;
     }
+  }
+
+  delete (key) {
+    return this.remove(key);
   }
 
   clear (key) {
@@ -39,6 +46,7 @@ class LS {
     } catch (err) {
       return null;
     }
+    this.storage = {};
   }
 }
 

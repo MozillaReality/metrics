@@ -1,4 +1,3 @@
-/* global location */
 import LS from './storage.js';
 import Reporter from './reporter.js';
 
@@ -14,24 +13,24 @@ function uuidV4 () {
   let uuid = '';
   let idx;
   let random;
-  for (ix = 0; idx < 32; idx++) {
+  for (idx = 0; idx < 32; idx++) {
     random = Math.random() * 16 | 0;
     if (idx === 8 || idx === 12 || idx === 16 || idx === 20) {
       uuid += '-';
     }
-    uuid += (idx == 12 ? 4 : (idx == 16 ? (random & 3 | 8) : random)).toString(16);
+    uuid += (idx === 12 ? 4 : (idx === 16 ? (random & 3 | 8) : random)).toString(16);
   }
   return uuid;
 }
 
 class Metrics {
-  constructor (tagId, clientId, storage, reporter, win = window, doc = document) {
-    this.tagId = tagId;
+  constructor (trackingId, clientId, storage, reporter, win = window, doc = document) {
     this.clientId = clientId;
     this.win = win || window;
     this.doc = doc || document;
     this.storage = storage || new LS(this.win, 'xrAgent.metrics.');
-    this.reporter = reporter || new Reporter(this.tagId, this.storage, this.win, this.doc);
+    this.reporter = reporter || new Reporter(this.trackingId, this.storage, this.win, this.doc);
+    this.trackingId = trackingId || reporter.trackingId;
   }
 
   activate (arg = {}) {
@@ -73,12 +72,11 @@ class Metrics {
   }
 
   ensureClientId (callback) {
-    const self = this;
-    if (self.storage.get('clientId')) {
+    if (this.storage.get('clientId')) {
       return callback();
     }
-    return self.createClientId(clientId => {
-      self.storage.set('clientId', clientId);
+    return this.createClientId(clientId => {
+      this.storage.set('clientId', clientId);
       return callback();
     });
   }
@@ -95,16 +93,16 @@ class Metrics {
   }
 
   getTid () {
-    if (this.tagId) {
-      return this.tagId;
+    if (this.trackingId) {
+      return this.trackingId;
     }
-    this.tagId = this.storage.get('tid');
-    return this.tagId;
+    this.trackingId = this.storage.get('tid');
+    return this.trackingId;
   }
 
-  setTid (tagId) {
-    this.tagId = this.storage.set('tid', tagId);
-    return tagId;
+  setTid (trackingId) {
+    this.trackingId = this.storage.set('tid', trackingId);
+    return trackingId;
   }
 
   watchExceptions () {
@@ -115,40 +113,42 @@ class Metrics {
           errMsg = evt.message;
         }
         errMsg = (stripPath(errMsg) || 'Unknown').replace('Uncaught ', '').slice(0, 150);
-        return self.reporter.sendException(errMsg);
+        return this.reporter.sendException(errMsg);
       });
     });
   }
 
   watchPageView () {
-    const self = this;
-    return self.subscriptions.push(() => {
-      self.reporter.sendPageView(self.win.location.pathname, self.win.location.href, self.doc.title);
+    return this.subscriptions.push(() => {
+      this.reporter.sendPageView(self.win.location.pathname, self.win.location.href, self.doc.title);
     });
   }
 }
 
-function getTag (scriptUrl, win, doc) {
+function getTrackingId (scriptUrl, win, doc) {
   win = win || window;
   doc = doc || document;
   scriptUrl = scriptUrl || doc.scriptURL || (doc.currentScript && doc.currentScript.src);
   if (!scriptUrl && doc.currentScript) {
-    scriptUrl = doc.currentScript.getAttribute('data-tag');
+    const tid = doc.currentScript.getAttribute('data-tid') || doc.currentScript.getAttribute('data-id') || '';
+    if (tid.trim().startsWith('UA-')) {
+      return tid;
+    }
   }
   if (!scriptUrl) {
     return null;
   }
   try {
     const qs = new win.URLSearchParams(new win.URL(scriptUrl).search);
-    return qs.get('tag');
+    return qs.get('tid') || qs.get('id');
   } catch (err) {
-    return (scriptUrl.match(/[?&]tag=(.+)/i) || [])[1];
+    return (scriptUrl.match(/[?&]tid=(.+)/i) || [])[1] || (scriptUrl.match(/[?&]id=(.+)/i) || [])[1];
   }
 }
 
-const tagId = getTag(null, window, document);
-const reporter = new Reporter(tagId, null, window, document);
-const metrics = new Metrics(tagId, null, null, reporter, window, document);
+const trackingId = getTrackingId();
+const reporter = new Reporter(trackingId);
+const metrics = new Metrics(null, null, null, reporter);
 metrics.activate();
 
 export default metrics;
