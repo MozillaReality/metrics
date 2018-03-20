@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity example • WebXR Metrics</title>
+    <script src="../../metrics.js?tid=UA-115368566-1"></script>
+  </head>
+  <body>
+    <div id="loader">
+      <div id="loading" class="loading">Loading</div>
+      <div id="progress" class="progress"></div>
+    </div>
+
+    <div id="game">
+      <div id="gameContainer"></div>
+    </div>
+
+    <div id="instruction">
+      <div id="novr" class="panel center">
+        <h3>You&rsquo;ll need a <a href="https://webvr.rocks/">WebVR-enabled browser</a> and VR headset to fully enjoy this experience.</h3>
+        <p>In the meantime, <strong><em>click and drag</em></strong> to have a look around!</p>
+        <p>
+          <button class="confirm">Continue</button>
+        </p>
+      </div>
+    </div>
+
+    <div id="vr">
+      <div id="status">
+        <strong>Ready!</strong>
+        <div id="icons">
+          <span class="togglevr">Toggle VR</span>
+          <template id="motion-controller">
+            <img src="motion-controllers.png" height="33" alt="Motion Controller icon">
+          </template>
+        </div>
+        <small><a href="https://webvr.rocks/">Not working?</a></small>
+      </div>
+      <button id="entervr" value="Enter VR"></button>
+    </div>
+  </body>
+</html>
