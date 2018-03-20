@@ -192,7 +192,7 @@ class Reporter {
     const capabilities = new Capabilities(this.win, this.doc, this.nav);
     const hardware = capabilities.hardwareFeatures;
     const browser = capabilities.browserFeatures;
-    console.log(capabilities, hardware);
+    console.log(capabilities.browserFeatures);
     return {
       sr: hardware.screenResolution,
       vp: hardware.windowSize,

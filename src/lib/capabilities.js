@@ -131,6 +131,7 @@ class HardwareFeatures {
     this.win = win;
     this.doc = doc;
     this.nav = nav || this.win.navigator || navigator || {};
+    return this;
   }
 
   get devicePixelRatio () {
