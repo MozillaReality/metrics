@@ -1,6 +1,6 @@
 # WebXR Metrics
 
-Help improve the [WebXR API](https://immersive-web.github.io/webxr/) and ecosystem by sending usage statistics, performance metrics, and JavaScript errors to the [Mozilla Mixed Reality](https://vr.mozilla.org/).
+Help improve the [WebXR API](https://immersive-web.github.io/webxr/) and ecosystem by sending usage statistics, performance metrics, and JavaScript errors to the [Mozilla Mixed Reality](https://vr.mozilla.org/) team.
 
 
 ## Privacy Notice for Data Collection
